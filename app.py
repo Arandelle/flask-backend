@@ -1,81 +1,88 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from pymongo import MongoClient
-from dotenv import load_dotenv
-import os
 from bson import ObjectId
+import os
 
+# Load environment variable locally
+from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
 
-# ✅ Configure CORS to allow your Next.js frontend
+# CORS configuration
 CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "https://coinwise-opal.vercel.app"  # Add your production URL here
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
+    r"/api/*": {"origins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://coinwise-opal.vercel.app"
+    ]}
 })
 
-# Get mongo uri from environment variable
+# MongoDB connection
 MONGO_URI = os.getenv("MONGO_URI")
-
 if not MONGO_URI:
     raise ValueError("MONGO_URI environment variable not set")
 
-# Connect to MongoDB
-client = MongoClient(MONGO_URI)
-db = client["coinwise"]
-collections = db["transactions"]
+try:
+    client = MongoClient(MONGO_URI, tls=True)  # proper SSL
+    db = client["coinwise"]
+    collections = db["transactions"]
+except Exception as e:
+    print("Failed to connect to MongoDB:", e)
+    raise e
 
-# GET retrieve all transactions
+# Routes
 @app.route('/api/transactions', methods=['GET'])
 def get_transactions():
-    transactions = list(collections.find({}, {"_id": 0}))
-    return jsonify(transactions)
+    try:
+        transactions = list(collections.find({}, {"_id": 0}))
+        return jsonify(transactions)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# GET by ID - retrieve a single transaction
 @app.route('/api/transactions/<transaction_id>', methods=['GET'])
 def get_transaction(transaction_id):
-    transaction = collections.find_one({"_id": ObjectId(transaction_id)})
-    if transaction:
-        transaction["_id"] = str(transaction["_id"])
-        return jsonify(transaction)
-    return jsonify({"error": "Transaction not found"}), 404
+    try:
+        transaction = collections.find_one({"_id": ObjectId(transaction_id)})
+        if transaction:
+            transaction["_id"] = str(transaction["_id"])
+            return jsonify(transaction)
+        return jsonify({"error": "Transaction not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# POST - create a new transaction
 @app.route('/api/transactions', methods=['POST'])
 def add_transaction():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
-    result = collections.insert_one(data)
-    return jsonify({"message": "Transaction added", "id": str(result.inserted_id)}), 201
+    try:
+        result = collections.insert_one(data)
+        return jsonify({"message": "Transaction added", "id": str(result.inserted_id)}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# PUT - update an existing transaction
-@app.route('/api/transactions/<transaction_id>', methods=["PUT"])
+@app.route('/api/transactions/<transaction_id>', methods=['PUT'])
 def update_transaction(transaction_id):
     data = request.get_json()
-    result = collections.update_one(
-        {"_id": ObjectId(transaction_id)},
-        {"$set": data}
-    )
-    if result.matched_count == 0:
-        return jsonify({"error": "Transaction not found"}), 404
-    return jsonify({"message": "Transaction updated"}), 200
+    try:
+        result = collections.update_one({"_id": ObjectId(transaction_id)}, {"$set": data})
+        if result.matched_count == 0:
+            return jsonify({"error": "Transaction not found"}), 404
+        return jsonify({"message": "Transaction updated"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# DELETE - delete a transaction
-@app.route("/api/transactions/<transaction_id>", methods=["DELETE"])
+@app.route('/api/transactions/<transaction_id>', methods=['DELETE'])
 def delete_transaction(transaction_id):
-    result = collections.delete_one({"_id": ObjectId(transaction_id)})
-    if result.deleted_count == 0:
-        return jsonify({"error": "Transaction not found"}), 404
-    return jsonify({"message": "Transaction deleted"}), 200
+    try:
+        result = collections.delete_one({"_id": ObjectId(transaction_id)})
+        if result.deleted_count == 0:
+            return jsonify({"error": "Transaction not found"}), 404
+        return jsonify({"message": "Transaction deleted"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 def index():
