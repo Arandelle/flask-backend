@@ -15,7 +15,7 @@ CORS(app, resources={
         "origins": [
             "http://localhost:3000",
             "http://localhost:3001",
-            "https://coinwise-opal.vercel.app/"  # Add your production URL here
+            "https://coinwise-opal.vercel.app"  # Add your production URL here
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type"]
@@ -23,7 +23,10 @@ CORS(app, resources={
 })
 
 # Get mongo uri from environment variable
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+MONGO_URI = os.getenv("MONGO_URI")
+
+if not MONGO_URI:
+    raise ValueError("MONGO_URI environment variable not set")
 
 # Connect to MongoDB
 client = MongoClient(MONGO_URI)
