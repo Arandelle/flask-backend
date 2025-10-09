@@ -12,9 +12,9 @@ app = Flask(__name__)
 CORS(app)  # ✅ Allow cross-origin requests (Next.js -> Flask)
 
 # Get mongo uri from environment variable
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 
-# Connec to MongoDB
+# Connect to MongoDB
 client = MongoClient(MONGO_URI)
 db = client["coinwise"] # database name
 collections = db["transactions"] # collection name
